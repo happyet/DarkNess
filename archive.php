@@ -7,7 +7,7 @@
 			the_archive_description( '<div class="taxonomy-description">', '</div>' );
 			echo '</div>';
 			while (have_posts()): the_post();
-				get_template_part('content', 'list');
+				get_template_part('arch/archive', get_post_format());
 			endwhile;
 		endif;?>
 	</div>
