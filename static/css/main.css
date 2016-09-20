@@ -135,7 +135,7 @@ a:hover {
 	right: 0;
 	bottom: 0;
 	left: 0;
-	background-color: rgba(0,0,0,.65);
+	background-color: rgba(0,0,0,.85);
 	z-index: 50
 }
 .header-menu {
@@ -264,7 +264,7 @@ a:hover {
 .post-views {
 	background-position: 0 -42px;
 }
-.comment-nums {
+.archive-meta .comment-nums {
 	margin-right: 0;
 	background-position: 0 -90px
 }
