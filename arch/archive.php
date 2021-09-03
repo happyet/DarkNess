@@ -1,4 +1,4 @@
-<article class="hentry-archive translucent">
+<article class="hentry-archive translucent<?php if(is_sticky()) echo ' sticky';?>">
 	<div class="archive-thumb">
 		<?php my_theme_thumb($type='full'); ?>
 	</div>

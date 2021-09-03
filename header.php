@@ -3,6 +3,10 @@
 <head>
     <meta charset="<?php bloginfo( 'charset' ); ?>" />
     <meta name="viewport" content="initial-scale=1.0,user-scalable=no,minimal-ui" />
+	<meta name="theme-color" content="#1b1b1b">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="msapplication-navbutton-color" content="#1b1b1b">
     <title><?php wp_title( '-', true, 'right' ); ?></title>
     <?php wp_head();?>
 </head>

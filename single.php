@@ -38,7 +38,7 @@
 								$add_class = '';
 								if(isset($_COOKIE['_post_like_' . $post_id])) $add_class = ' liked';
 							?>
-							<span class="like<?php echo $add_class; ?>" data-id = "<?php echo $post_id; ?>">+<i class="like-txt"><?php echo $like_num; ?></i> 人喜欢</span>
+							<span class="like<?php echo $add_class; ?>" data-id = "<?php echo $post_id; ?>">喜欢 (+<em class="like-txt"><?php echo $like_num; ?></em>)</span>
 						</div>
 
 					

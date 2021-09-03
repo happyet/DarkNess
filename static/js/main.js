@@ -15,6 +15,7 @@ jQuery(document).ready(function($) {
 	$('.search-icon a').click(function(){
 		$(this).toggleClass('on');
 		$('.header-searchform').toggle(300);
+		$('.search-field').focus();
 		return false;
 	});
 
@@ -47,16 +48,19 @@ jQuery(document).ready(function($) {
 		}
 	});
 	$('.archive-month').each(function(){
-    var num=$(this).next().find('li').size();
-    var text=$(this).find('a').text();
-    $(this).find('a').html(text+'<em> ( '+num+' 篇文章 )</em>');
-  });
-	$('.archive-month span').toggle(function(){
-		$(this).parent().next().show();
-		$(this).text('-');
-	},function(){
-		$(this).parent().next().hide();
-		$(this).text('+');
+    	var num=$(this).next().find('li').size();
+    	var text=$(this).find('a').text();
+    	$(this).find('a').html(text+'<em> ( '+num+' 篇文章 )</em>');
+  	});
+	$('.archive-month span').on('click',function(){
+		var dd = $(this).parent().next();
+		if(dd.css('display') == 'none'){
+			dd.show();
+			$(this).text(' - ');
+		}else{
+			dd.hide();
+			$(this).text(' + ');
+		}
 	});
 	
 	$('.search-trigger').on('hover', function(){
@@ -74,9 +78,11 @@ jQuery(document).ready(function($) {
 	$(window).scroll(function() {
 		var st = $(this).scrollTop(),
 		backToTop = $('.back-to-top span');
-		if (st > 200) {
+		if (st > 250) {
+			$('.site-header').addClass('fixed');
 			backToTop.show(100);
 		} else {
+			$('.site-header').removeClass('fixed');
 			backToTop.hide(100);
 		}
 	});
@@ -87,34 +93,44 @@ jQuery(document).ready(function($) {
 		800);
 	});
 
-	var $commentform = $('#commentform'),
-	$comments = $('#comments-title'),
-	$cancel = $('#cancel-comment-reply-link'),
-	cancel_text = $cancel.text();
-	$('#commentform').submit(function() {
+	var __cancel = $('#cancel-comment-reply-link'),
+	__cancel_text = __cancel.text(),
+	__list = 'commentlist';//your comment wrapprer
+	$(document).on("submit", "#commentform", function() {
 		$.ajax({
 			url: lmsim.ajax_url,
 			data: $(this).serialize() + "&action=ajax_comment",
 			type: $(this).attr('method'),
-			beforeSend:addComment.createButterbar("提交中...."),
+			beforeSend: faAjax.createButterbar("提交中...."),
 			error: function(request) {
-				var t = addComment;
+				var t = faAjax;
 				t.createButterbar(request.responseText);
 			},
 			success: function(data) {
 				$('textarea').each(function() {
 					this.value = ''
 				});
-				var t = addComment,
-				cancel = t.I('cancel-comment-reply-link'),
-				temp = t.I('wp-temp-form-div'),
-				respond = t.I(t.respondId),
-				post = t.I('comment_post_ID').value,
-				parent = t.I('comment_parent').value;
+				var t = faAjax,
+					cancel = t.I('cancel-comment-reply-link'),
+					temp = t.I('wp-temp-form-div'),
+					respond = t.I(t.respondId),
+					post = t.I('comment_post_ID').value,
+					parent = t.I('comment_parent').value;
 				if (parent != '0') {
 					$('#respond').before('<ol class="children">' + data + '</ol>');
+				} else if (!$('.' + __list ).length) {
+					if (ajaxcomment.formpostion == 'bottom') {
+						$('#respond').before('<ol class="' + __list + '">' + data + '</ol>');
+					} else {
+						$('#respond').after('<ol class="' + __list + '">' + data + '</ol>');
+					}
+
 				} else {
-					$('.comment-respond').before('<ol class="commentlist">' + data + '</ol>');// your comments wrapper
+					if (ajaxcomment.order == 'asc') {
+						$('.' + __list ).append(data); // your comments wrapper
+					} else {
+						$('.' + __list ).prepend(data); // your comments wrapper
+					}
 				}
 				t.createButterbar("提交成功");
 				cancel.style.display = 'none';
@@ -128,47 +144,7 @@ jQuery(document).ready(function($) {
 		});
 		return false;
 	});
-	addComment = {
-		moveForm: function(commId, parentId, respondId) {
-			var t = this,
-			div,
-			comm = t.I(commId),
-			respond = t.I(respondId),
-			cancel = t.I('cancel-comment-reply-link'),
-			parent = t.I('comment_parent'),
-			post = t.I('comment_post_ID');
-			$cancel.text(cancel_text);
-			t.respondId = respondId;
-			if (!t.I('wp-temp-form-div')) {
-				div = document.createElement('div');
-				div.id = 'wp-temp-form-div';
-				div.style.display = 'none';
-				respond.parentNode.insertBefore(div, respond)
-			} ! comm ? (temp = t.I('wp-temp-form-div'), t.I('comment_parent').value = '0', temp.parentNode.insertBefore(respond, temp), temp.parentNode.removeChild(temp)) : comm.parentNode.insertBefore(respond, comm.nextSibling);
-			$("body").animate({
-				scrollTop: $('#respond').offset().top - 180
-			}, 400);
-			parent.value = parentId;
-			cancel.style.display = '';
-			cancel.onclick = function() {
-				var t = addComment,
-				temp = t.I('wp-temp-form-div'),
-				respond = t.I(t.respondId);
-				t.I('comment_parent').value = '0';
-				if (temp && respond) {
-					temp.parentNode.insertBefore(respond, temp);
-					temp.parentNode.removeChild(temp);
-				}
-				this.style.display = 'none';
-				this.onclick = null;
-				return false;
-			};
-			try {
-				t.I('comment').focus();
-			}
-			 catch(e) {}
-			return false;
-		},
+	faAjax = {
 		I: function(e) {
 			return document.getElementById(e);
 		},
@@ -180,8 +156,8 @@ jQuery(document).ready(function($) {
 		createButterbar: function(message) {
 			var t = this;
 			t.clearButterbar();
-			$("body").append('<div class="butterBar text-center"><span class="btn btn-default">' + message + '</span></div>');
-			setTimeout("jQuery(document).ready(function($) {$('.butterBar').remove();})", 2000);
+			$("body").append('<div class="butterBar butterBar--center"><p class="butterBar-message">' + message + '</p></div>');
+			setTimeout("jQuery('.butterBar').remove()", 3000);
 		}
 	};
 });

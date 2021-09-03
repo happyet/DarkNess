@@ -23,6 +23,21 @@ function lmsim_setup() {
     ) );
 }
 add_action( 'after_setup_theme', 'lmsim_setup' );
+function lmsim_widgets_init() {
+	register_sidebar(
+		array(
+			'name'          => __( '底部小工具' ),
+			'id'            => 'sidebar-1',
+			'description'   => __( 'Add widgets here to appear in your sidebar.', 'twentysixteen' ),
+			'before_widget' => '<section id="%1$s" class="widget %2$s">',
+			'after_widget'  => '</section>',
+			'before_title'  => '<h2 class="widget-title">',
+			'after_title'   => '</h2>',
+		)
+	);
+
+}
+add_action( 'widgets_init', 'lmsim_widgets_init' );
 /* 阻止站内文章Pingback
  * --------------------- */ 
 function lmsim_noself_ping( &$links ) {
@@ -44,12 +59,16 @@ function search_filter_page($query) {
 add_filter('pre_get_posts','search_filter_page');
 
 function lmsim_load_static_files(){
-	//$static_dir = 'http://7xowd8.com1.z0.glb.clouddn.com/static';
 	$static_dir = get_template_directory_uri() . '/static';
 	wp_enqueue_style('lmsim-style', $static_dir . '/css/main.css' , array(), '20160917' , 'screen');
+    if ( is_singular() && comments_open() && get_option( 'thread_comments' ) ) {
+        wp_enqueue_script( 'comment-reply' );
+    }
     wp_enqueue_script( 'lmsim', $static_dir . '/js/main.js' , array( 'jquery' ), '20151122', true );
     wp_localize_script( 'lmsim', 'lmsim', array(
-       	'ajax_url'   => admin_url('admin-ajax.php')
+       	'ajax_url'   => admin_url('admin-ajax.php'),
+        'order' => get_option('comment_order'),
+        'formpostion' => 'top',
     ) );
 }
 add_action( 'wp_enqueue_scripts', 'lmsim_load_static_files' );
@@ -87,11 +106,19 @@ function remove_open_sans() {
 	wp_enqueue_style('open-sans','');
 }
 add_action( 'init', 'remove_open_sans' );
-function get_ssl_avatar($avatar) {
-    $avatar = str_replace(array("www.gravatar.com", "0.gravatar.com", "1.gravatar.com", "2.gravatar.com"), "cn.gravatar.com", $avatar);
-    return $avatar;
+/**替换Gravatar头像为Cravatar头像**/
+function get_cravatar_url( $url ) {
+    $sources = array(
+        'www.gravatar.com',
+        '0.gravatar.com',
+        '1.gravatar.com',
+        '2.gravatar.com',
+        'secure.gravatar.com',
+        'cn.gravatar.com'
+    );
+    return str_replace( $sources, 'cravatar.cn', $url );
 }
-add_filter('get_avatar', 'get_ssl_avatar');
+add_filter( 'get_avatar_url', 'get_cravatar_url', 1 );
 
 /* 评论@父级评论
  * --------------- */
@@ -168,95 +195,19 @@ function lmsim_comment($comment, $args, $depth) {
 function mytheme_end_comment() {
 	echo '</li>';
 }
-add_action('wp_ajax_nopriv_ajax_comment', 'ajax_comment_callback');
-add_action('wp_ajax_ajax_comment', 'ajax_comment_callback');
-function ajax_comment_callback(){
-    global $wpdb;
-    $comment_post_ID = isset($_POST['comment_post_ID']) ? (int) $_POST['comment_post_ID'] : 0;
-    $post = get_post($comment_post_ID);
-    $post_author = $post->post_author;
-    if ( empty($post->comment_status) ) {
-        do_action('comment_id_not_found', $comment_post_ID);
-        ajax_comment_err('Invalid comment status.');
+function fa_ajax_comment_callback(){
+    $comment = wp_handle_comment_submission( wp_unslash( $_POST ) );
+    if ( is_wp_error( $comment ) ) {
+        $data = $comment->get_error_data();
+        if ( ! empty( $data ) ) {
+            fa_ajax_comment_err($comment->get_error_message());
+        } else {
+            exit;
+        }
     }
-    $status = get_post_status($post);
-    $status_obj = get_post_status_object($status);
-    if ( !comments_open($comment_post_ID) ) {
-        do_action('comment_closed', $comment_post_ID);
-        ajax_comment_err('Sorry, comments are closed for this item.');
-    } elseif ( 'trash' == $status ) {
-        do_action('comment_on_trash', $comment_post_ID);
-        ajax_comment_err('Invalid comment status.');
-    } elseif ( !$status_obj->public && !$status_obj->private ) {
-        do_action('comment_on_draft', $comment_post_ID);
-        ajax_comment_err('Invalid comment status.');
-    } elseif ( post_password_required($comment_post_ID) ) {
-        do_action('comment_on_password_protected', $comment_post_ID);
-        ajax_comment_err('Password Protected');
-    } else {
-        do_action('pre_comment_on_post', $comment_post_ID);
-    }
-    $comment_author       = ( isset($_POST['author']) )  ? trim(strip_tags($_POST['author'])) : null;
-    $comment_author_email = ( isset($_POST['email']) )   ? trim($_POST['email']) : null;
-    $comment_author_url   = ( isset($_POST['url']) )     ? trim($_POST['url']) : null;
-    $comment_content      = ( isset($_POST['comment']) ) ? trim($_POST['comment']) : null;
     $user = wp_get_current_user();
-    if ( $user->exists() ) {
-        if ( empty( $user->display_name ) )
-            $user->display_name=$user->user_login;
-        $comment_author       = esc_sql($user->display_name);
-        $comment_author_email = esc_sql($user->user_email);
-        $comment_author_url   = esc_sql($user->user_url);
-        $user_ID              = esc_sql($user->ID);
-        if ( current_user_can('unfiltered_html') ) {
-            if ( wp_create_nonce('unfiltered-html-comment_' . $comment_post_ID) != $_POST['_wp_unfiltered_html_comment'] ) {
-                kses_remove_filters();
-                kses_init_filters();
-            }
-        }
-    } else {
-        if ( get_option('comment_registration') || 'private' == $status )
-            ajax_comment_err('Sorry, you must be logged in to post a comment.');
-    }
-    $comment_type = '';
-    if ( get_option('require_name_email') && !$user->exists() ) {
-        if ( 6 > strlen($comment_author_email) || '' == $comment_author )
-            ajax_comment_err( 'Error: please fill the required fields (name, email).' );
-        elseif ( !is_email($comment_author_email))
-            ajax_comment_err( 'Error: please enter a valid email address.' );
-    }
-    if ( '' == $comment_content )
-        ajax_comment_err( 'Error: please type a comment.' );
-    $dupe = "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = '$comment_post_ID' AND ( comment_author = '$comment_author' ";
-    if ( $comment_author_email ) $dupe .= "OR comment_author_email = '$comment_author_email' ";
-    $dupe .= ") AND comment_content = '$comment_content' LIMIT 1";
-    if ( $wpdb->get_var($dupe) ) {
-        ajax_comment_err('Duplicate comment detected; it looks as though you&#8217;ve already said that!');
-    }
-    if ( $lasttime = $wpdb->get_var( $wpdb->prepare("SELECT comment_date_gmt FROM $wpdb->comments WHERE comment_author = %s ORDER BY comment_date DESC LIMIT 1", $comment_author) ) ) {
-        $time_lastcomment = mysql2date('U', $lasttime, false);
-        $time_newcomment  = mysql2date('U', current_time('mysql', 1), false);
-        $flood_die = apply_filters('comment_flood_filter', false, $time_lastcomment, $time_newcomment);
-        if ( $flood_die ) {
-            ajax_comment_err('You are posting comments too quickly.  Slow down.');
-        }
-    }
-    $comment_parent = isset($_POST['comment_parent']) ? absint($_POST['comment_parent']) : 0;
-    $commentdata = compact('comment_post_ID', 'comment_author', 'comment_author_email', 'comment_author_url', 'comment_content', 'comment_type', 'comment_parent', 'user_ID');
-
-    $comment_id = wp_new_comment( $commentdata );
-
-
-    $comment = get_comment($comment_id);
     do_action('set_comment_cookies', $comment, $user);
-    $comment_depth = 1;
-    $tmp_c = $comment;
-    while($tmp_c->comment_parent != 0){
-        $comment_depth++;
-        $tmp_c = get_comment($tmp_c->comment_parent);
-    }
-    $GLOBALS['comment'] = $comment;
-    //这里修改成你的评论结构
+    $GLOBALS['comment'] = $comment; //根据你的评论结构自行修改，如使用默认主题则无需修改
     ?>
     <li <?php comment_class(); ?> id="li-comment-<?php comment_ID() ?>" itemtype="http://schema.org/Comment" itemscope itemprop="comment">
 		<div id="comment-<?php comment_ID(); ?>" class="comment-holder">
@@ -280,7 +231,9 @@ function ajax_comment_callback(){
 	</li>
     <?php die();
 }
-function ajax_comment_err($a) {
+add_action('wp_ajax_nopriv_ajax_comment', 'fa_ajax_comment_callback');
+add_action('wp_ajax_ajax_comment', 'fa_ajax_comment_callback');
+function fa_ajax_comment_err($a) {
     header('HTTP/1.0 500 Internal Server Error');
     header('Content-Type: text/plain;charset=UTF-8');
     echo $a;
